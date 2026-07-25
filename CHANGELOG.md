@@ -4,6 +4,36 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.67.0] - 2026-07-25
+### Added
+- **SkillOpt EJECUTABLE: seams `rollout`/`reflect` reales (`skilltrain/seams.py`) + `optimize.py --run`.** El
+  andamiaje (guard/scorer-gate/apply_skill/bucle) ya estaba testeado; faltaban las dos piezas que LANZAN
+  modelo/agente. Ahora existen:
+  - `engagement_transcript(eval_id)` — resume un engagement YA CORRIDO (blackboard + qué vectores se probaron +
+    dónde se atascó) en un transcript de fallo. Solo lectura; embebe campos estructurados y nombres de
+    artefacto, nunca contenido crudo/loot/`*_ref` (E3). `eval_id` validado anti-traversal.
+  - `rollout(skill_text, evals, skill_name, runner)` — instala la skill candidata (`SkillSwap` atómico) y corre
+    el `runner` (`run_gate --canary`) por eval, recogiendo transcripts.
+  - `reflect(skill_text, transcripts, n, provider)` — pide al proveedor (`claude -p` / opencode) `n` ediciones
+    de la SKILL.md que ataquen los atascos vistos, entre marcadores `<<<SKILL>>>/<<<END>>>`.
+  - `optimize.py --run` cablea `shell_runner` + los seams y delega en el bucle `run()` ya testeado.
+- Tests deterministas nuevos (`t_seams`) con proveedor falso inyectado (sin LLM real en CI).
+### Security
+- **`reflect` es un subproceso de MODELO, no "solo editar texto".** El transcript embebido es AGENT-AUTHORED
+  (superficie de prompt-injection), así que el `claude -p` de reflect corre con las herramientas de ACCIÓN
+  DENEGADAS (`--disallowedTools` Bash/Edit/Write/Task/WebFetch/…) → solo genera texto, no escribe/ejecuta en el
+  repo. Defensa en profundidad; los backstops reales siguen siendo el lint determinista, el reward SOLO-canario,
+  el GATE heldout y **humano+council antes de desplegar** (el lint es denylist, no juez semántico). `_call_provider`
+  usa lista de args (sin `shell=True`); prompt acotado (anti-E2BIG); parser solo-marcadores (sin fallback laxo
+  que se tragara el preámbulo del modelo); baseline no relinta la skill ACTUAL (confiable) para no abortar.
+- **Sin auto-aplicación:** el candidato se escribe SOLO en `skilltrain/out/` (gitignored); desplegar a
+  `plugin/skills/` exige humano+council. `build_plugin.py` no empaqueta `skilltrain/`.
+- **Verificado en Kali** contra el fallo real (`tokenaso`): rollout→reflect→lint produjo un candidato
+  gobernanza-LIMPIO que añade metodología web-autenticado→OS-RCE (el gap real medido en el baseline), sin
+  necesidad de correr el bucle caro de score/GATE. **Council 3-lentes GO** (security/devil/simplicity) con sus
+  7 fixes aplicados (tools denegados en reflect, confinamiento de `eval_id`, parser recortado, etiqueta de
+  acceso real, baseline sin relint, cap de prompt, docstring honesta).
+
 ## [2.66.1] - 2026-07-25
 ### Added
 - **`--iter-timeout` (flag CLI, def. 900s)** para el bucle de reanudación de `run_gate.py`: techo por

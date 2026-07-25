@@ -145,11 +145,59 @@ def t_optimize_loop():
           any(scorer.eval_is_canary_capable(e) for e in heldout))
 
 
+def t_seams():
+    import json as _json
+    import seams  # noqa: E402
+    # _extract_skill: marcadores / fence ``` / encabezado / nada
+    check("seams: extrae entre <<<SKILL>>>/<<<END>>>",
+          seams._extract_skill("pre <<<SKILL>>>\n# Skill\ncuerpo\n<<<END>>> post") == "# Skill\ncuerpo")
+    check("seams: extrae de fence ```", seams._extract_skill("```markdown\n# S\nx\n```").startswith("# S"))
+    check("seams: sin nada usable -> ''", seams._extract_skill("blah blah") == "")
+    # reflect con _call FALSO (sin LLM): respeta n, dedupe, descarta vacío/idéntico
+    calls = {"n": 0}
+
+    def fake_call(_p):
+        calls["n"] += 1
+        return "<<<SKILL>>>\n# Mejorada\nnuevo paso\n<<<END>>>"
+
+    cands = seams.reflect("# Original", ["transcript de fallo"], 3, _call=fake_call)
+    check("seams: reflect devuelve 1 candidato (dedupe de 3 iguales)", len(cands) == 1 and "Mejorada" in cands[0])
+    check("seams: reflect llamó al proveedor n=3 veces", calls["n"] == 3)
+    check("seams: reflect descarta candidato idéntico al original",
+          seams.reflect("# X", ["t"], 1, _call=lambda p: "<<<SKILL>>>\n# X\n<<<END>>>") == [])
+    p = seams._build_reflect_prompt("SKILLTEXT", [{"transcript": "ATASCO_AQUI"}])
+    check("seams: el prompt incluye la skill y el transcript", "SKILLTEXT" in p and "ATASCO_AQUI" in p)
+    # engagement_transcript sobre un blackboard FALSO (monkeypatch de seams.ROOT)
+    d = tempfile.mkdtemp()
+    os.makedirs(os.path.join(d, "engagements", "GATE-x"))
+    bb = {"phase": "exploitation", "targets": [{"asset": "lab", "access_level": "none"}],
+          "findings": [{"title": "SQLi login", "status": "false_positive"},
+                       {"title": "Demo creds", "status": "exploited"}]}
+    open(os.path.join(d, "engagements", "GATE-x", "engagement.json"), "w", encoding="utf-8").write(_json.dumps(bb))
+    orig = seams.ROOT
+    try:
+        seams.ROOT = d
+        tx = seams.engagement_transcript("x")
+    finally:
+        seams.ROOT = orig
+    check("seams: transcript marca root NO alcanzado", "root_alcanzado=NO" in tx)
+    check("seams: transcript agrupa por estado (exploited/false_positive)",
+          "exploited" in tx and "false_positive" in tx)
+    # confinamiento anti-traversal del eval_id (defensa en profundidad)
+    check("seams: _safe_eval_id rechaza traversal", _raises(lambda: seams._safe_eval_id("../../etc/passwd")))
+    check("seams: _safe_eval_id rechaza barras", _raises(lambda: seams._safe_eval_id("a/b")))
+    check("seams: _safe_eval_id acepta id normal", seams._safe_eval_id("dockerlabs-injection") == "dockerlabs-injection")
+    # el fallback laxo de _extract_skill ya no existe: un texto con # pero sin marcadores/fence -> ''
+    check("seams: sin marcadores ni fence -> '' (no se traga el preámbulo)",
+          seams._extract_skill("Claro, aquí tienes:\n# Skill\ncuerpo") == "")
+
+
 if __name__ == "__main__":
     print("== guard =="); t_guard()
     print("== apply_skill =="); t_apply_skill()
     print("== scorer gate =="); t_scorer_gate()
     print("== scorer skill+lint =="); t_scorer_skill_lint()
     print("== optimize loop =="); t_optimize_loop()
+    print("== seams (transcript/reflect) =="); t_seams()
     print("\n" + ("TODOS OK" if not _fail else f"FALLOS: {len(_fail)}"))
     sys.exit(1 if _fail else 0)

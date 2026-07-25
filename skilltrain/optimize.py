@@ -109,7 +109,10 @@ def run(config, runner, rollout_fn=_seam_rollout, reflect_fn=_seam_reflect, skil
         raise ValueError("faltan evals canary-capable en train o heldout (añade bloques canary/per_host).")
     skill, k = config["skill"], config.get("k", 3)
     current = current_skill_text(skill, skills_root)
-    baseline = scorer.score_skill(skill, current, heldout, k, runner, skills_root)["reward"]
+    # La skill ACTUAL ya está desplegada (pasó humano+council): es CONFIABLE, no se relinta (si tuviera una IP
+    # o un nombre de guard legítimo en su texto, lintarla abortaría el baseline). El lint es para los CANDIDATOS
+    # que produce reflect (texto no confiable) — esos SÍ se lintan en el bucle y en score_skill.
+    baseline = scorer.score_skill(skill, current, heldout, k, runner, skills_root, lint=False)["reward"]
     best_reward = baseline
     print(f"[skilltrain] baseline heldout reward = {baseline:.3f}")
     for it in range(config.get("max_iters", 5)):
@@ -138,13 +141,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=os.path.join(HERE, "config.json"))
     ap.add_argument("--dry-run", action="store_true", help="enseña el plan sin lanzar rollouts/reflect")
+    ap.add_argument("--run", action="store_true",
+                    help="CORRE el bucle REAL (Kali: labs vivos + provider). CARO: rollout/score/GATE lanzan "
+                         "run_gate por eval × k. Escribe solo out/best_skill.md (NO auto-aplica; humano+council).")
     args = ap.parse_args()
     cfg = load_config(args.config)
     if args.dry_run:
         dry_run_plan(cfg)
         return
-    print("[skilltrain] correr el bucle real requiere labs vivos + provider (Kali): inyecta runner/rollout/"
-          "reflect desde el arnés de Kali, o usa --dry-run.", file=sys.stderr)
+    if args.run:
+        import seams  # noqa: E402  (import perezoso: solo el run REAL necesita los seams que lanzan modelo/agente)
+        skill_name = cfg["skill"]
+        provider = cfg.get("provider", "claude")
+        model = cfg.get("model")
+        runner = scorer.shell_runner
+        best = run(cfg, runner,
+                   rollout_fn=lambda text, evals: seams.rollout(text, evals, skill_name, runner),
+                   reflect_fn=lambda text, tx, n: seams.reflect(text, tx, n, provider=provider, model=model))
+        print(f"[skilltrain] hecho. mejor skill candidata → "
+              f"{os.path.relpath(os.path.join(OUT_DIR, 'best_skill.md'), ROOT)} "
+              f"(NO auto-aplicada; requiere humano + council para desplegar a plugin/skills/). len={len(best)}")
+        return
+    print("[skilltrain] usa --dry-run (plan) o --run (bucle REAL en Kali: labs vivos + provider). Correr el "
+          "bucle sin entorno no tiene sentido.", file=sys.stderr)
     sys.exit(2)
 
 
