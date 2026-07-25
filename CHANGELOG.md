@@ -4,6 +4,25 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.66.1] - 2026-07-25
+### Added
+- **`--iter-timeout` (flag CLI, def. 900s)** para el bucle de reanudación de `run_gate.py`: techo por
+  iteración/turno configurable (antes constante hardcodeada — el council de v2.66 marcó esa rigidez). Labs con
+  cadenas de explotación largas necesitan una ventana mayor para no cortar a un agente a media faena. Valida
+  `≥ 1` (un `0`/negativo degradaría a un FAIL silencioso indistinguible de un fallo real del motor → aborta).
+### Changed
+- **`resume_prompt` reforzado (anti-visión-de-túnel).** La sesión de reanudación recibe un puntero corto a la
+  §"Disciplina anti-sesgos" de AGENTS.md: time-boxear un vector `candidate` que no confirma y PIVOTAR, y
+  priorizar ENCADENAR lo ya `confirmed`/`exploited` (creds/tokens/sesiones) hacia takeover→privesc. Es un
+  puntero al playbook, no una duplicación de la doctrina (evita deriva prompt↔playbook).
+- **Nota de eficacia (honesta):** en un lab real (`tokenaso`) estos cambios MEJORARON la metodología del motor
+  frente al baseline —degradó a `false_positive` las SQLi que no confirmaban, pivotó al vector de token, encadenó
+  creds→login→panel admin— pero **NO** cerraron el gap de capacidad web-autenticado→OS-RCE (la caja no llegó a
+  root). Se publican como mejora de metodología/config, no como cierre de ese gap. No relajan ninguna puerta
+  (scope_guard/approval son ortogonales al prompt; el diff no toca perms/canario/scope). Council 3-lentes GO
+  (devil/security/simplicity) con los 2 fixes suyos aplicados (validación de `--iter-timeout`; recorte de la
+  duplicación del prompt).
+
 ## [2.66.0] - 2026-07-24
 ### Added
 - **Gate del canario EJECUTABLE de forma autónoma y headless (`benchmark/run_gate.py`).** Cierra los dos
