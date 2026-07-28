@@ -4,6 +4,14 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.67.1] - 2026-07-28
+### Security
+- **Datos de fixture de test genericizados.** `tests/test_header_guard.py`, `tests/test_guards.py` y
+  `benchmark/test_web_eval.py` referenciaban un dominio y un identificador de programa REALES en sus
+  casos de ejemplo (arrastrados desde v2.48.0/v2.50.0/v2.51.0). Sustituidos por equivalentes sintéticos
+  (`acme.example`/`acmenet.example`, handle `huntr0`) — cero cambio de comportamiento, mismos 37+18
+  casos en verde. Auditoría: barrido de todo el árbol (no solo el diff) confirma cero restos.
+
 ## [2.67.0] - 2026-07-25
 ### Added
 - **SkillOpt EJECUTABLE: seams `rollout`/`reflect` reales (`skilltrain/seams.py`) + `optimize.py --run`.** El

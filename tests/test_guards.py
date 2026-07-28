@@ -22,7 +22,7 @@ sys.path.insert(0, HOOKS)
 import header_guard as H  # noqa: E402
 import scope_guard as SG  # noqa: E402
 
-REQ = "BUGCROWD: c4rm3na"
+REQ = "BUGCROWD: huntr0"
 _fail = []
 
 
@@ -39,7 +39,7 @@ def t_header():
           H.header_gate("nuclei -u https://t.example.com/x", REQ) is not None)
     # 2) invocación real con cabecera en -H -> permitida
     check("real nuclei con -H -> allow",
-          H.header_gate('nuclei -u https://t.example.com/x -H "BUGCROWD: c4rm3na"', REQ) is None)
+          H.header_gate('nuclei -u https://t.example.com/x -H "BUGCROWD: huntr0"', REQ) is None)
     # 3) heredoc que ESCRIBE un script mencionando nuclei -> permitido (fix)
     cmd3 = "cat > run.sh <<'EOF'\nnuclei -l hosts.txt -tags citrix,netscaler\nEOF"
     check("heredoc escribe script con nuclei -> allow (fix)", H.header_gate(cmd3, REQ) is None)
@@ -58,7 +58,7 @@ def t_header():
           H.header_gate("curl -x http://127.0.0.1:8080 https://t.example.com", REQ) is None)
     # 8) curl con cabecera correcta -> allow
     check("curl con -H -> allow",
-          H.header_gate('curl -H "BUGCROWD: c4rm3na" https://t.example.com', REQ) is None)
+          H.header_gate('curl -H "BUGCROWD: huntr0" https://t.example.com', REQ) is None)
     # 9) strip_heredocs conserva la línea de apertura y descarta el cuerpo
     stripped = H.strip_heredocs("cat > f <<'EOF'\nSECRETBODY nuclei\nEOF\necho done")
     check("strip conserva apertura", "cat > f" in stripped)
@@ -91,7 +91,7 @@ def t_header():
 def t_scope_unit():
     for tok in ("$host", "{host}", "${TARGET}", "$1", "`h`", "a.b%c", "x*.example.com"):
         check(f"_is_placeholder({tok!r}) True", SG._is_placeholder(tok) is True)
-    for tok in ("ole.connect.optus.com.au", "192.168.1.1", "example.com", "a-b.test.io"):
+    for tok in ("ole.connect.acme.example", "192.168.1.1", "example.com", "a-b.test.io"):
         check(f"_is_placeholder({tok!r}) False", SG._is_placeholder(tok) is False)
 
 
@@ -109,8 +109,8 @@ def _run_scope(command, scope):
 
 
 def t_scope_e2e():
-    scope = {"in_scope": {"domains": ["*.optus.com.au"]},
-             "out_of_scope": {"domains": ["personal.optus.com.au"]}}
+    scope = {"in_scope": {"domains": ["*.acme.example"]},
+             "out_of_scope": {"domains": ["personal.acme.example"]}}
     # placeholder -> deny con motivo accionable
     denied, out = _run_scope("nuclei -u https://$host/logon", scope)
     check("e2e placeholder $host -> deny", denied)
@@ -118,10 +118,10 @@ def t_scope_e2e():
     denied, _ = _run_scope("curl https://{target}/x", scope)
     check("e2e placeholder {target} -> deny", denied)
     # host literal in-scope -> allow
-    denied, _ = _run_scope("curl https://ole.connect.optus.com.au/logon", scope)
+    denied, _ = _run_scope("curl https://ole.connect.acme.example/logon", scope)
     check("e2e literal in-scope -> allow", not denied)
     # host literal out-of-scope -> deny
-    denied, _ = _run_scope("curl https://personal.optus.com.au/x", scope)
+    denied, _ = _run_scope("curl https://personal.acme.example/x", scope)
     check("e2e literal out-of-scope -> deny", denied)
     # comando sin target (cat) -> allow
     denied, _ = _run_scope("cat contracts/scope.json", scope)

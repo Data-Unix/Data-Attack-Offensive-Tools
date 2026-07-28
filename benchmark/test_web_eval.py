@@ -90,7 +90,7 @@ def t_lab_target():
     for t in ("http://127.0.0.1:3000", "http://localhost:4280", "https://10.10.10.5:8888/api",
               "127.0.0.1", "juice.htb", "192.168.1.10", "http://[::1]:3000", "http://8.8.8.8@127.0.0.1/"):
         check(f"is_lab_target LAB: {t}", RG.is_lab_target(t) is True)
-    for t in ("http://example.com:3000", "https://target.optus.com.au", "http://8.8.8.8",
+    for t in ("http://example.com:3000", "https://target.acme.example", "http://8.8.8.8",
               "RELLENAR: maquina lab", "http://127.0.0.1@8.8.8.8/", "http://169.254.169.254/",
               "http://[fe80::1]/", "http://2130706433/", "http://0.0.0.0/"):
         check(f"is_lab_target NO-lab: {t}", RG.is_lab_target(t) is False)
