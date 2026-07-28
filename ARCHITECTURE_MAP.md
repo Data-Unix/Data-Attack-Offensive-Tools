@@ -3,7 +3,7 @@
 
 # 🗺️ Mapa de Arquitectura — Cyberseg Agents
 
-> **Generado:** 2026-07-23 08:19:26 UTC · **Refleja el estado real** del proyecto en ese momento.
+> **Generado:** 2026-07-28 22:43:36 UTC · **Refleja el estado real** del proyecto en ese momento.
 > Regenerar a mano: `python tools/gen_arch_diagram.py`
 
 ## Qué es esto (para reconstruir contexto si se pierde)
@@ -120,7 +120,7 @@ flowchart TB
 ## Componentes de soporte (estado real)
 
 - **Orquestador (hub):** `AGENTS.md` — sesión principal, no es un subagente.
-- **Hook de alcance:** a2a_guard.py, a2a_router_nudge.py, approval_gate.py, blackboard_guard.py, budget_guard.py, circuit_breaker.py, fs_guard.py, header_guard.py, loop_guard.py, memory_guard.py, noise_guard.py, scope_guard.py, secret_scan.py, steering_nudge.py, subagent_stop.py, validate_blackboard.py (PreToolUse, bloquea fuera de scope).
+- **Hook de alcance:** a2a_guard.py, a2a_router_nudge.py, approval_gate.py, blackboard_guard.py, blackboard_integrity_check.py, budget_guard.py, circuit_breaker.py, fs_guard.py, header_guard.py, loop_guard.py, memory_guard.py, noise_guard.py, scope_guard.py, secret_scan.py, steering_nudge.py, subagent_stop.py, validate_blackboard.py (PreToolUse, bloquea fuera de scope).
 - **Blackboard / contratos:** a2a-message.schema.json, agent-card.schema.json, agent-cards.json, engagement.json, engagement.schema.json, examples, finding.schema.json, scope.example.json, scope.json, steering-directive.schema.json, target.schema.json.
 - **RAG de vulnerabilidades:** db.py, enrich_cve5.py, enrich_epss.py, enrich_exploits.py, enrich_msf.py, enrich_nuclei.py, ingest_kev.py, ingest_recent.py, query_vulns.py, refresh.py (KEV+EPSS+CVE recientes, alimenta a vuln-triage).
 - **RAG de conocimiento (técnicas):** _venv.py, embed.py, ingest_atomics.py, ingest_attack.py, ingest_corpus.py, ingest_feeds.py, ingest_gtfobins.py, ingest_lolbas.py, kb.py, kb_vec.py, query_kb.py, refresh_kb.py (Capa 1 estructurada GTFOBins/LOLBAS/Atomic/ATT&CK + Capa 2 semántica HackTricks/PaTT/PEASS/817 cyber-skills/feeds; lo consultan los agentes de explotación vía la skill `rag-technique-lookup`).

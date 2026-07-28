@@ -37,6 +37,7 @@ flowchart TB
     AGENT -->|comando ofensivo| G_HITL
     AGENT -->|mensaje A2A a otro agente| G_A2A
     AGENT -->|escribe en su memoria de aprendizaje| G_MEMORY
+    ORQ -->|retorno de un subagente (Task)| G_INTEGRITY
 
     subgraph GATES["Guardarraíles"]
         G_INJECT{{"🧱 datos ≠ instrucciones<br/>anti-inyección · prompt (LLM01)"}}
@@ -54,6 +55,7 @@ flowchart TB
         G_FS{{"📁 fs_guard.py<br/>PreToolUse · C20 (LLM02/§1·§6)"}}
         G_BB{{"📝 blackboard_guard.py<br/>PreToolUse·Bash · C21 (LLM02)"}}
         G_CB{{"🔌 circuit_breaker.py<br/>Pre+PostToolUse·Bash · C22 (LLM10/§9)"}}
+        G_INTEGRITY{{"🩺 blackboard_integrity_check.py<br/>PostToolUse·Task · C23 (LLM02/LLM05)"}}
     end
 
     G_SCOPE -->|en scope| TARGET
@@ -73,6 +75,7 @@ flowchart TB
     G_FS -.->|symlink/`..` fuera de la zona| BLOCK
     G_BB -.->|escritura del blackboard por Bash| BLOCK
     G_CB -.->|target caído: N fallos de conexión| BLOCK
+    G_INTEGRITY -.->|recuentos encogidos / JSON inválido / esquema roto| FIX
 ```
 
 ## Inventario de controles (estado real)
@@ -101,6 +104,7 @@ flowchart TB
 | C21 | **Anti-escritura del blackboard por Bash** — bloquea los patrones comunes de mutación de `contracts/engagement.json` vía Bash (redirección `>`/`>>`, `tee`, `sed -i`, `cp`/`mv`/`dd`/`install`/`truncate`, `open(...,'w')`/`​.write()` de Python), forzando que toda mutación pase por las tools `Write`/`Edit` — que SÍ están gateadas por `validate_blackboard`/`secret_scan`/`a2a_guard`. Cierra el hueco (councils A y D) de un agente con `Bash` (p.ej. `auth-recon`) volcando un secreto al blackboard esquivando los guards de secreto. Contrato consciente (no un sandbox: la ofuscación se contiene con el contenedor efímero de C); LEER el blackboard no se bloquea | Determinista | `.claude/hooks/blackboard_guard.py` (PreToolUse·Bash) | **LLM02 Sensitive Info Disclosure** (+ integridad del blackboard) |
 | C20 | **Confinamiento de lectura de código de cliente** — bloquea una lectura cuando (a) su destino real cae bajo `~/.claude` (credenciales del operador), (b) el **ancla** `recon/src` es un symlink que resuelve fuera del repo, (c) un **symlink** o un `..` escapa del árbol de código de cliente (`engagements/<id>/recon/src/`), o (d) un symlink interno del repo escapa del repo. Verifica el `file_path` de cada `Read` y la **ruta-consulta** (`path`) de `Grep`/`Glob`; el recorrido profundo de Grep/Glob no sigue symlinks por defecto (ripgrep) y su confinamiento DURO lo aporta el contenedor. Cierra el hueco de FS que dejó `code-recon` (mejora "A"); el **contenedor efímero por-engagement** (`deploy/engagement-run.sh`, monta solo ese engagement, sin egress) da el confinamiento por namespace de montaje (mejora "C") | Determinista | `.claude/hooks/fs_guard.py` (PreToolUse) + `deploy/engagement-run.sh` / `docker-compose.engagement.yml` | **LLM02 Sensitive Info Disclosure** (+ aislamiento §1/§6) |
 | C22 | **Circuit-breaker por target** — cuenta los fallos de CONEXIÓN consecutivos por host (rechazo/timeout/DNS/host-down; NO un 4xx/5xx, que significa que el host responde) y, al superar el umbral (`constraints.circuit_breaker_threshold`, def. 5), ABRE el breaker de ese host: los siguientes comandos contra él se bloquean hasta un cooldown (`circuit_breaker_cooldown_s`, def. 300) —medio-abierto— o hasta que vuelva a responder (se cierra). Corta el machaque de un target caído/IP baneada; complementa C13 (global), C18 (ruido) y C19 (comando idéntico) con el eje TARGET. PostToolUse observa la salida y cuenta; PreToolUse bloquea. Reusa la extracción de host de `scope_guard`. FAIL-OPEN | Determinista | `.claude/hooks/circuit_breaker.py` (Pre+PostToolUse·Bash) | **LLM10 Unbounded Consumption** (+ no-daño §5/§9) |
+| C23 | **Integridad post-retorno del blackboard** — tras CADA retorno de un subagente (`Task`), comprueba que `contracts/engagement.json` siga siendo JSON válido, que pase la validación de esquema, y que `len(targets)`/`len(findings)`/`len(tasks)`/`len(evidence)` NO hayan ENCOGIDO respecto a un watermark **ratchet monótono** (nunca baja, aunque los recuentos actuales encojan — una alerta ignorada NO borra la evidencia; la siguiente comparación sigue viendo el encogimiento). Complementa C21 (bloquea vías de escritura CONOCIDAS por el comando) mirando el RESULTADO en vez del comando — caza el daño aunque la vía de escritura no estuviera en los patrones bloqueados. No bloquea (un PostToolUse no puede deshacer una tool ya ejecutada): inyecta `additionalContext` con la alerta para que el Orquestador la vea y decida verificar/restaurar (sin asumir que existe un backup automático). Un cambio de `engagement_id` es reset legítimo (nunca alerta). **Límites conscientes** (ver docstring del módulo): solo mira retornos de `Task` (un Bash directo del Orquestador no lo dispara — `blackboard_guard.py` sigue siendo la barrera dura ahí); el watermark no tiene lock ante delegaciones paralelas (riesgo aceptado, detección no gate). FAIL-OPEN | Determinista (detección, no bloqueo) | `.claude/hooks/blackboard_integrity_check.py` (PostToolUse·Task) | **LLM02 Sensitive Info Disclosure** + **LLM05 Improper Output Handling** |
 
 > **Refuerzo del router A2A (no es un gate):** `a2a_router_nudge.py` (PostToolUse sobre `Task`)
 > recuerda al Orquestador, tras cada retorno de subagente, que entregue los mensajes A2A `pending`

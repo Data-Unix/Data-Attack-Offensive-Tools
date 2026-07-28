@@ -16,6 +16,7 @@ import json
 import os
 import re
 import tempfile
+from functools import lru_cache
 
 CONTRACTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "contracts")
 
@@ -103,22 +104,29 @@ def atomic_write_json(path, data, indent=2):
         raise
 
 
+@lru_cache(maxsize=32)
 def _required(schema_path):
+    # Cacheado: dentro de un mismo proceso, validate_engagement() se llama muchas veces contra los
+    # MISMOS ficheros de esquema (suite de tests, analyze_engagement.py, o el hook C23 en un bucle
+    # de delegaciones) — evita reabrir/reparsear el JSON en cada llamada (hallazgo del council,
+    # 2026-07-28). No ayuda entre invocaciones de un hook (proceso nuevo cada vez), solo dentro de
+    # un mismo proceso; los esquemas no cambian en caliente durante una corrida.
     try:
         with open(schema_path, encoding="utf-8") as f:
-            return json.load(f).get("required", [])
+            return tuple(json.load(f).get("required", []))
     except Exception:
-        return []
+        return ()
 
 
+@lru_cache(maxsize=32)
 def _nested_required(engagement_schema_path, key):
     """`required` de los items de un array anidado (lessons / evidence) en engagement.schema."""
     try:
         with open(engagement_schema_path, encoding="utf-8") as f:
             props = json.load(f).get("properties", {})
-        return props.get(key, {}).get("items", {}).get("required", [])
+        return tuple(props.get(key, {}).get("items", {}).get("required", []))
     except Exception:
-        return []
+        return ()
 
 
 def validate_engagement(data, contracts_dir=CONTRACTS):

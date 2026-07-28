@@ -101,7 +101,7 @@ GPT-OSS-120B). Eso permite, **en laboratorio**, llevar a free **toda** la cadena
 > errores). **La medición OFICIAL de capacidad del GATE se corre con Claude** — los free-tier degradan
 > calidad y tienen rate-limits (~40 RPM). Sigue siendo **LAB-ONLY**: jamás datos de cliente, nunca
 > E2/E3; el bot real de engagements es **100% Anthropic**. **El espejo opencode NO ejecuta los hooks
-> deterministas (scope_guard/C1–C21) ni el bus A2A** (es inherente a opencode, no a NVIDIA): corrobora
+> deterministas (scope_guard/C1–C23) ni el bus A2A** (es inherente a opencode, no a NVIDIA): corrobora
 > el cableado, no es la medición oficial. El perfil vive en el fichero versionado
 > `tools/routing.nvidia-lab.json`; aplícalo con **`python tools/apply_routing.py nvidia-lab`** (revierte
 > con `python tools/apply_routing.py default`), o el `auto-deploy.sh` lo ofrece (`--opencode-nvidia` /

@@ -44,6 +44,31 @@ BLOCK = [
     'python3 -c "from pathlib import Path; Path(\'contracts/engagement.json\').write_text(d)"',
     'python3 -c "import shutil; shutil.copy(\'loot/x\', \'contracts/engagement.json\')"',
     'python3 -c "import shutil; shutil.move(\'tmp.json\', \'contracts/engagement.json\')"',
+    # os.rename/os.replace y Path.rename/replace (incidente INCIDENT-2026-07-27): el mismo
+    # hueco que cp/mv pero via stdlib de Python, con el blackboard como destino...
+    'python3 -c "import os; os.replace(\'/tmp/x.json\', \'contracts/engagement.json\')"',
+    'python3 -c "import os; os.rename(\'/tmp/x.json\', \'contracts/engagement.json\')"',
+    # ...o como origen (mover/renombrar el blackboard FUERA de su sitio es igual de destructivo):
+    'python3 -c "import os; os.rename(\'contracts/engagement.json\', \'/tmp/x.json\')"',
+    'python3 -c "from pathlib import Path; Path(\'contracts/engagement.json\').replace(\'/tmp/x.json\')"',
+    # ...o como DESTINO de Path.rename/replace (hallazgo de revisión 2026-07-28: la 1ª versión de
+    # este fix solo cazaba el blackboard como objeto, nunca dentro de los paréntesis de la llamada —
+    # exactamente el mismo patrón "prepara aparte y aterriza" del incidente, solo que con .replace()
+    # en vez de os.replace()):
+    'python3 -c "from pathlib import Path; Path(\'/tmp/x.json\').replace(\'contracts/engagement.json\')"',
+    'python3 -c "from pathlib import Path; Path(\'/tmp/x.json\').rename(\'contracts/engagement.json\')"',
+    # Borrado directo (rm/os.remove/os.unlink/Path.unlink) — reabre el blackboard a un estado vacío
+    # tan destructivamente como sobrescribirlo, y no estaba cazado en ninguna versión anterior:
+    "rm contracts/engagement.json",
+    "rm -f contracts/engagement.json",
+    'python3 -c "import os; os.remove(\'contracts/engagement.json\')"',
+    'python3 -c "import os; os.unlink(\'contracts/engagement.json\')"',
+    'python3 -c "from pathlib import Path; Path(\'contracts/engagement.json\').unlink()"',
+    # El watermark de integridad (C23) merece la MISMA protección: borrarlo resetea su detección en
+    # silencio (hallazgo del council, 2026-07-28) — es tan sensible como el propio blackboard.
+    "rm contracts/.blackboard_watermark",
+    'python3 -c "import os; os.remove(\'contracts/.blackboard_watermark\')"',
+    'echo "{}" > contracts/.blackboard_watermark',
 ]
 for cmd in BLOCK:
     ok(bg.blocking_reason(cmd) is not None, f"bloquea: {cmd[:50]}")
@@ -59,6 +84,8 @@ ALLOW = [
     "ls contracts/",
     # LEER el blackboard para copiarlo a otro sitio NO es escribirlo (el BB va en los args, no es el destino):
     'python3 -c "p.write_bytes(open(\'contracts/engagement.json\',\'rb\').read())"',
+    "cat contracts/.blackboard_watermark",
+    "python3 tools/analyze_engagement.py",
 ]
 for cmd in ALLOW:
     ok(bg.blocking_reason(cmd) is None, f"permite: {cmd[:50]}")

@@ -4,6 +4,29 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.0] - 2026-07-28
+### Added
+- **C23 `blackboard_integrity_check.py` — integridad post-retorno del blackboard (PostToolUse·Task).**
+  Complementa C21 (`blackboard_guard.py`, que bloquea vías de escritura CONOCIDAS por el texto del
+  comando) mirando el RESULTADO en vez del comando: tras cada retorno de un subagente comprueba que
+  `contracts/engagement.json` siga siendo JSON válido, pase la validación de esquema, y que
+  `len(targets)`/`len(findings)`/`len(tasks)`/`len(evidence)` no hayan encogido respecto a un
+  watermark **ratchet monótono** (`contracts/.blackboard_watermark`, gitignored) — nunca baja, para
+  que una alerta ignorada no borre la evidencia del daño. No bloquea (un PostToolUse no puede
+  deshacer una tool ya ejecutada): inyecta `additionalContext` para que el Orquestador decida.
+  FAIL-OPEN; límites conscientes documentados (solo mira retornos de `Task`, sin lock ante
+  delegaciones paralelas — riesgo aceptado de una capa de detección, no de un gate).
+### Changed
+- **C21 `blackboard_guard.py` ampliado a ambas direcciones.** Cierra un hueco real: un subagente
+  esquivaba la escritura del blackboard con `os.rename()`/`os.replace()`. La extensión inicial solo
+  cazaba el blackboard como OBJETO de `.rename()/.replace()`; se amplía para cazarlo también como
+  ARGUMENTO/destino (`Path(origen).replace('contracts/engagement.json')`), la dirección que la
+  primera versión dejaba pasar. Se añade además protección de BORRADO (`rm`, `os.remove`,
+  `os.unlink`, `Path.unlink`) sobre el blackboard y sobre el watermark de C23 — borrar el watermark
+  reseteaba su detección en silencio.
+- `tools/blackboard.py`: `_required`/`_nested_required` cacheadas (`functools.lru_cache`) — evita
+  reparsear los mismos ficheros de esquema en llamadas repetidas dentro de un mismo proceso.
+
 ## [2.67.1] - 2026-07-28
 ### Security
 - **Datos de fixture de test genericizados.** `tests/test_header_guard.py`, `tests/test_guards.py` y
