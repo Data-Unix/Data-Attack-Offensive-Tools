@@ -60,7 +60,7 @@
 
 ## Tabla de contenidos
 
-- [Qué es](#qué-es)
+- [Qué es](#qué-es-data-attack)
 - [Características clave](#características-clave)
 - [Arquitectura](#arquitectura)
 - [Despliegue en Kali (E2)](#despliegue-en-kali-e2)
@@ -628,9 +628,12 @@ cyberseg-agents/
 ├── contracts/      → blackboard: scope, engagement y esquemas de findings/targets
 ├── docs/           → referencias, protocolo de handoff, guía de informe, humanizer
 │   └── assets/     → banner y guía de estilo visual
+├── assets/         → banners de marca (ASCII/imagen) para el arranque de CLI/bot/TUI
 ├── templates/      → plantilla de informe + brief del engagement
+├── report/         → informe de MUESTRA (datos sintéticos) generado desde `contracts/examples/`
 ├── tools/          → kit del engagement: attack-path (grafo), proxy HTTP + diff-scope, steering,
 │                     screenshot (visión), consenso, sesión/TOTP, análisis de coherencia y mapa de arquitectura
+├── tests/          → suite de tests deterministas de guards/esquemas/RAG (sin red, sin LLM)
 ├── rag/            → RAG de vulnerabilidades KEV+EPSS+recientes (SQLite)
 │   ├── knowledge/  → RAG de conocimiento: técnicas (Capa 1 estructurada + Capa 2 semántica) + canon OWASP
 │   ├── context/    → RAG de contexto per-engagement (efímero, aislado por engagement, EN-ZONA)
@@ -645,7 +648,9 @@ cyberseg-agents/
 ├── .claude/        → settings, hooks (alcance, presupuesto, supervisión, blackboard + integridad,
 │                     secretos, A2A, aislamiento FS, anti-alboroto/anti-bucle, circuit-breaker, cabecera
 │                     obligatoria de programa, auditoría de subagentes) y los 29 subagentes
-└── .opencode/      → espejo de los agentes para opencode
+├── .opencode/      → espejo de los agentes para opencode
+└── plugin/         → paquete distribuible para Claude Code (generado por `tools/build_plugin.py`,
+                      no editar a mano): agentes + skills + hook de alcance
 ```
 
 ## Licencia

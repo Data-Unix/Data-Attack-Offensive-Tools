@@ -4,6 +4,27 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.2] - 2026-07-28
+### Fixed
+- **Segunda pasada de auditoría del README** (a petición explícita: verificar exposición de datos +
+  organización/consistencia completa, incluyendo diagrama y tablas). Sin cambios funcionales.
+  - **Enlace roto del índice**: `[Qué es](#qué-es)` apuntaba a un ancla que no existe — el heading
+    real es "Qué es Data Attack" (ancla de GitHub `#qué-es-data-attack`). Corregido.
+  - **"Estructura del repositorio" incompleta**: faltaban 4 directorios de nivel superior reales
+    (`assets/`, `report/`, `tests/`, `plugin/`) — añadidos con una línea de descripción cada uno.
+  - Verificados exhaustivamente y en VERDE (sin incongruencias): los 16 enlaces internos a otros
+    ficheros del repo, los comandos de cada tabla (RAG de vulnerabilidades/conocimiento/contexto/
+    triage, deploy, verify, docker, agentsview, herramientas del engagement) contra el `argparse`/
+    flags reales de cada script, la tabla de tiers de riesgo del bot contra `bot/intel/risk.py`,
+    ambos diagramas mermaid (balance de corchetes/llaves/comillas, sin el bug de `·` sin comillas
+    que rompió el render en v2.1.1), y el `LICENSE` contra la afirmación de licencia del README.
+  - **Barrido de seguridad de TODO el árbol tracked** (no solo el diff de esta sesión): sin claves/
+    tokens/API-keys reales, sin bloques de clave privada, sin IPs/dominios de infraestructura propia,
+    sin ficheros `.env`/`.key`/`.pem`/`scope.json`/`engagement.json` colados, sin `engagements/`/`loot/`
+    trackeados. Los pocos hits de patrones "sospechosos" (`AKIAIOSFODNN7EXAMPLE`, JWTs `eyJ...`,
+    tokens de Telegram, `report/SAMPLE-INFORME-ACME-2026-001.md`) son todos fixtures de test o el
+    informe de MUESTRA con datos sintéticos que existe desde el commit inicial — verificados uno a uno.
+
 ## [2.68.1] - 2026-07-28
 ### Added
 - **`header_guard.py` inventariado como control C24** en `GUARDRAILS.md` (tabla + diagrama). El hook
