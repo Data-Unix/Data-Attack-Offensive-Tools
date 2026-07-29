@@ -4,6 +4,35 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.3] - 2026-07-29
+### Fixed
+- **El Orquestador headless (`run_gate.py`) no delegaba vía `Task`, dejando el blackboard vacío.**
+  En corridas autónomas (`claude -p`) el Orquestador ejecutaba el tooling ofensivo directamente por
+  `Bash` en vez de delegar en los especialistas — contradice su Identidad (AGENTS.md: "no ejecutas
+  tooling ofensivo tú mismo"), y como solo el especialista delegado escribe `targets[]`/`findings[]`,
+  el engagement corría sin dejar rastro graduable. `task_prompt()` y `resume_prompt()` ahora
+  refuerzan explícitamente la delegación por `Task` y, en la reanudación, priorizan registrar
+  delegaciones si `tasks[]` está vacío. Verificado en Kali: `evidence/subagents.jsonl` pasó de
+  quedarse plano a crecer 5→14 líneas en una corrida real, con `tasks[]` mostrando delegación
+  multi-agente genuina. **Alcance honesto (council):** es un refuerzo de PROMPT, no una puerta
+  determinista — `set_eval_perms()` sigue dejando `Bash` en `allow` a nivel de sesión (no hay forma
+  de distinguir "Bash del Orquestador" de "Bash de un subagente" en el motor de permisos actual), así
+  que nada impide técnicamente que el Orquestador vuelva a ejecutar tooling él mismo bajo presión de
+  tiempo; esta corrida es n=1, no una garantía. Documentado como excepción deliberada al principio
+  "puntero corto, no dupliques doctrina" de `resume_prompt()` (ver docstrings de ambas funciones): un
+  puntero a AGENTS.md §Identidad ya existía y no bastó, así que aquí sí se restatea explícito.
+- **Regla `deny` inefectiva en `.claude/settings.json`**: `Write(./contracts/scope.json)` es un
+  no-op (el motor de permisos solo reconoce `Edit(path)` para herramientas de fichero — cubre
+  `Write`/`Edit`/`MultiEdit`/`NotebookEdit`). Corregido a `Edit(./contracts/scope.json)`: la
+  protección de defensa-en-profundidad contra la reescritura de `scope.json` por la tool del agente
+  ahora sí está activa (antes nunca lo estuvo). No afecta a `run_gate.py` (que reemplaza `scope.json`
+  a nivel de sistema de ficheros con `os.replace`, fuera de la tool `Write` del agente). **Nota:**
+  `permissions.deny` en sí tiene historial documentado de no aplicarse en algunas versiones de Claude
+  Code (anthropics/claude-code#6699); esta capa sigue siendo defensa-en-profundidad sobre el motor de
+  permisos, no un sustituto de un hook determinista — si se quiere blindaje duro e independiente de la
+  versión del CLI, el candidato natural es extender `memory_guard.py` para bloquear también escrituras
+  del agente sobre `scope.json`.
+
 ## [2.68.2] - 2026-07-28
 ### Fixed
 - **Segunda pasada de auditoría del README** (a petición explícita: verificar exposición de datos +

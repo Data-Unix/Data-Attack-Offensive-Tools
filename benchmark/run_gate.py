@@ -324,11 +324,22 @@ def engagement_dir(ev):
 
 
 def task_prompt(ev, target, eng_dir):
+    """Prompt de ARRANQUE para una sesión fresca headless. Restate EXPLÍCITO (no un puntero corto) de la
+    delegación por `Task` (AGENTS.md §Identidad ya lo dice y la sesión lo carga vía @AGENTS.md, pero
+    empíricamente NO bastaba: el Orquestador headless corría el tooling él mismo y el blackboard se quedaba
+    vacío). Es la excepción deliberada al patrón "puntero, no duplicar doctrina" de `resume_prompt()`: ahí un
+    puntero basta porque refuerza una prioridad ya seguida; aquí hacía falta el texto íntegro porque la
+    doctrina se estaba IGNORANDO del todo, no solo infra-priorizando."""
     phases = " → ".join(ev.get("expected_phases", []))
     crit = ev.get("success_criteria", {})
     return (
         f"Ejecuta un engagement de seguridad ofensiva AUTORIZADO y AUTÓNOMO contra el ÚNICO target en "
         f"`contracts/scope.json` ({target}), un laboratorio. Sigue tu playbook (AGENTS.md): {phases}. "
+        f"DELEGA cada fase en el especialista correspondiente mediante la herramienta Task "
+        f"(active-recon, vuln-triage, web-exploit, post-exploit…) — tú NO ejecutas tooling ofensivo "
+        f"directamente (nmap/curl/sqlmap/john…): tu rol es planificar, delegar, validar y encadenar "
+        f"(Identidad de AGENTS.md). Cada especialista delegado es quien escribe `targets[]`/`findings[]` "
+        f"en el blackboard al retornar; sin delegación no hay blackboard ni prueba que gradúe el engagement. "
         f"Objetivo de éxito: {crit.get('type','root')} (deja la PRUEBA REAL en la evidencia: la salida "
         f"íntegra del comando que lo demuestre —capturada del propio target— o la flag). Escribe TODOS "
         f"los artefactos en `{os.path.relpath(eng_dir, ROOT)}/` "
@@ -370,7 +381,9 @@ def resume_prompt(ev, target):
     """Prompt de REANUDACIÓN para una sesión fresca: retoma del blackboard, no repite lo hecho. Un puntero corto
     a la §"Disciplina anti-sesgos" de AGENTS.md (que la sesión ya carga vía @AGENTS.md) ataca el falso-stall
     observado —sobre-invertir en un candidato que no confirma en vez de pivotar/encadenar— sin duplicar la
-    doctrina en el prompt (evita deriva prompt↔playbook)."""
+    doctrina en el prompt (evita deriva prompt↔playbook). La delegación por Task es la ÚNICA excepción a ese
+    principio (ver docstring de `task_prompt`): un puntero solo no bastó empíricamente, así que aquí también
+    se restatea explícito en vez de solo referenciar AGENTS.md §Identidad."""
     crit = ev.get("success_criteria", {})
     return (
         f"RETOMA el engagement de seguridad ofensiva AUTORIZADO y AUTÓNOMO EN CURSO contra el ÚNICO target en "
@@ -380,7 +393,10 @@ def resume_prompt(ev, target):
         f"CAPTURADA del target en la evidencia (la salida íntegra del comando que lo demuestre, o la flag). "
         f"Antes de re-machacar un vector `candidate` que ya falló, TIME-BOXÉALO y PIVOTA; prioriza ENCADENAR lo "
         f"ya `confirmed`/`exploited` (creds/tokens/sesiones) hacia takeover→privesc (AGENTS.md §Disciplina "
-        f"anti-sesgos). Trabaja sin pausas (modo auto); respeta scope y no-daño. NO cierres hasta lograr el "
+        f"anti-sesgos). Recuerda: DELEGAS cada fase en el especialista vía Task (active-recon, vuln-triage, "
+        f"web-exploit, post-exploit…) — nunca ejecutas el tooling tú mismo. Si `tasks[]` está vacío o no hay "
+        f"delegaciones registradas, esa es la prioridad AHORA MISMO (sin ellas nadie escribe el blackboard). "
+        f"Trabaja sin pausas (modo auto); respeta scope y no-daño. NO cierres hasta lograr el "
         f"objetivo o agotar vectores distintos. Sigue tu playbook (AGENTS.md). Al lograrlo, delega en reporting "
         f"y knowledge-postmortem."
     )

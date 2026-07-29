@@ -19,7 +19,7 @@
     ],
     "deny": [
       "Bash(rm -rf /*)",
-      "Write(./contracts/scope.json)"
+      "Edit(./contracts/scope.json)"
     ]
   },
   "hooks": {
