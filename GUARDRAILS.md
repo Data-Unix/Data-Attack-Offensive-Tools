@@ -34,6 +34,7 @@ flowchart TB
     AGENT -->|comando de escaneo| G_NOISE
     AGENT -->|acción Bash repetida| G_LOOP
     AGENT -->|comando contra target| G_SCOPE
+    AGENT -->|petición HTTP a herramienta| G_HDR
     AGENT -->|comando ofensivo| G_HITL
     AGENT -->|mensaje A2A a otro agente| G_A2A
     AGENT -->|escribe en su memoria de aprendizaje| G_MEMORY
@@ -56,6 +57,7 @@ flowchart TB
         G_BB{{"📝 blackboard_guard.py<br/>PreToolUse·Bash · C21 (LLM02)"}}
         G_CB{{"🔌 circuit_breaker.py<br/>Pre+PostToolUse·Bash · C22 (LLM10/§9)"}}
         G_INTEGRITY{{"🩺 blackboard_integrity_check.py<br/>PostToolUse·Task · C23 (LLM02/LLM05)"}}
+        G_HDR{{"🏷️ header_guard.py<br/>PreToolUse·Bash · C24 (LLM06/§9)"}}
     end
 
     G_SCOPE -->|en scope| TARGET
@@ -76,6 +78,8 @@ flowchart TB
     G_BB -.->|escritura del blackboard por Bash| BLOCK
     G_CB -.->|target caído: N fallos de conexión| BLOCK
     G_INTEGRITY -.->|recuentos encogidos / JSON inválido / esquema roto| FIX
+    G_HDR -->|cabecera del programa presente| TARGET
+    G_HDR -.->|sin cabecera de programa (o fuera de un flag real)| BLOCK
 ```
 
 ## Inventario de controles (estado real)
@@ -105,6 +109,7 @@ flowchart TB
 | C20 | **Confinamiento de lectura de código de cliente** — bloquea una lectura cuando (a) su destino real cae bajo `~/.claude` (credenciales del operador), (b) el **ancla** `recon/src` es un symlink que resuelve fuera del repo, (c) un **symlink** o un `..` escapa del árbol de código de cliente (`engagements/<id>/recon/src/`), o (d) un symlink interno del repo escapa del repo. Verifica el `file_path` de cada `Read` y la **ruta-consulta** (`path`) de `Grep`/`Glob`; el recorrido profundo de Grep/Glob no sigue symlinks por defecto (ripgrep) y su confinamiento DURO lo aporta el contenedor. Cierra el hueco de FS que dejó `code-recon` (mejora "A"); el **contenedor efímero por-engagement** (`deploy/engagement-run.sh`, monta solo ese engagement, sin egress) da el confinamiento por namespace de montaje (mejora "C") | Determinista | `.claude/hooks/fs_guard.py` (PreToolUse) + `deploy/engagement-run.sh` / `docker-compose.engagement.yml` | **LLM02 Sensitive Info Disclosure** (+ aislamiento §1/§6) |
 | C22 | **Circuit-breaker por target** — cuenta los fallos de CONEXIÓN consecutivos por host (rechazo/timeout/DNS/host-down; NO un 4xx/5xx, que significa que el host responde) y, al superar el umbral (`constraints.circuit_breaker_threshold`, def. 5), ABRE el breaker de ese host: los siguientes comandos contra él se bloquean hasta un cooldown (`circuit_breaker_cooldown_s`, def. 300) —medio-abierto— o hasta que vuelva a responder (se cierra). Corta el machaque de un target caído/IP baneada; complementa C13 (global), C18 (ruido) y C19 (comando idéntico) con el eje TARGET. PostToolUse observa la salida y cuenta; PreToolUse bloquea. Reusa la extracción de host de `scope_guard`. FAIL-OPEN | Determinista | `.claude/hooks/circuit_breaker.py` (Pre+PostToolUse·Bash) | **LLM10 Unbounded Consumption** (+ no-daño §5/§9) |
 | C23 | **Integridad post-retorno del blackboard** — tras CADA retorno de un subagente (`Task`), comprueba que `contracts/engagement.json` siga siendo JSON válido, que pase la validación de esquema, y que `len(targets)`/`len(findings)`/`len(tasks)`/`len(evidence)` NO hayan ENCOGIDO respecto a un watermark **ratchet monótono** (nunca baja, aunque los recuentos actuales encojan — una alerta ignorada NO borra la evidencia; la siguiente comparación sigue viendo el encogimiento). Complementa C21 (bloquea vías de escritura CONOCIDAS por el comando) mirando el RESULTADO en vez del comando — caza el daño aunque la vía de escritura no estuviera en los patrones bloqueados. No bloquea (un PostToolUse no puede deshacer una tool ya ejecutada): inyecta `additionalContext` con la alerta para que el Orquestador la vea y decida verificar/restaurar (sin asumir que existe un backup automático). Un cambio de `engagement_id` es reset legítimo (nunca alerta). **Límites conscientes** (ver docstring del módulo): solo mira retornos de `Task` (un Bash directo del Orquestador no lo dispara — `blackboard_guard.py` sigue siendo la barrera dura ahí); el watermark no tiene lock ante delegaciones paralelas (riesgo aceptado, detección no gate). FAIL-OPEN | Determinista (detección, no bloqueo) | `.claude/hooks/blackboard_integrity_check.py` (PostToolUse·Task) | **LLM02 Sensitive Info Disclosure** + **LLM05 Improper Output Handling** |
+| C24 | **Cabecera HTTP obligatoria del programa** — cuando `scope.json` declara `constraints.required_http_header` (p.ej. programas bug bounty que exigen identificar el tráfico, `BUGCROWD: <handle>`), bloquea (fail-closed) cualquier herramienta HTTP conocida (curl/httpx/ffuf/nuclei/sqlmap/wpscan/…) contra el target salvo que la cabecera vaya en un flag de cabecera REAL (`-H`/`--header`/…) — no cuela por la URL, el body, el user-agent, un comentario o un nombre de fichero. Herramientas sin cabecera arbitraria por CLI (nikto/whatweb/wafw00f/testssl) quedan solo-proxy; un proxy explícito (`-x`/proxychains) exime (responsabilidad del operador). No-op si el programa no exige cabecera. Activo desde v2.48.0; inventariado aquí en v2.68.1 (hueco de documentación cerrado) | Determinista | `.claude/hooks/header_guard.py` (PreToolUse·Bash) | **LLM06 Excessive Agency** (trazabilidad exigida por el programa) |
 
 > **Refuerzo del router A2A (no es un gate):** `a2a_router_nudge.py` (PostToolUse sobre `Task`)
 > recuerda al Orquestador, tras cada retorno de subagente, que entregue los mensajes A2A `pending`

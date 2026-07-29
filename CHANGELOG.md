@@ -4,6 +4,27 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.1] - 2026-07-28
+### Added
+- **`header_guard.py` inventariado como control C24** en `GUARDRAILS.md` (tabla + diagrama). El hook
+  existe y está activo desde v2.48.0 (cabecera HTTP obligatoria de programa bug bounty), pero nunca
+  había tenido número de control ni entrada en el inventario de guardarraíles — hueco de
+  documentación cerrado, sin cambio funcional.
+### Fixed
+- **Auditoría del README** (contra el estado real del repo, no contra versiones pasadas):
+  - Sección "Seguridad" no mencionaba `blackboard_guard` (C21), `blackboard_integrity_check` (C23,
+    v2.68.0) ni `header_guard` (C24) — añadidos.
+  - "Estructura del repositorio" no listaba `header_guard` ni la integridad del blackboard entre
+    los hooks — añadidos.
+  - Consenso multi-persona (v2.57) y diff-scope PR-aware (v2.60) solo aparecían de pasada en el
+    árbol de estructura, nunca explicados — añadida una frase en las filas de `vuln-triage` y
+    `code-recon` del roster.
+  - "Referencia de comandos" no tenía entradas para `tools/steering.py`, `tools/http_proxy.py`,
+    `tools/diff_scope.py`, `tools/screenshot.py` y `tools/acquire_session.py` — nueva subsección
+    "Herramientas del engagement".
+  - Verificado en verde (sin drift): conteo de 29 agentes/16 skills, roster E1(8)/E2(19)/E3(2), y
+    "27 agentes" de anti-inyección — todos exactos contra el filesystem real.
+
 ## [2.68.0] - 2026-07-28
 ### Added
 - **C23 `blackboard_integrity_check.py` — integridad post-retorno del blackboard (PostToolUse·Task).**

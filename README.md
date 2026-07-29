@@ -332,7 +332,7 @@ fijados; el orquestador decide a quién llamar en cada fase.
 | **api-recon** | haiku-4-5 | Inventario de API: cosecha OpenAPI/Swagger, versiones, descubrimiento GraphQL. |
 | **mobile-recon** | haiku-4-5 | Análisis ESTÁTICO de apps móviles (APK/IPA): decompila, IPC, secretos, y extrae el backend hacia la vertical API. |
 | **firmware-recon** | haiku-4-5 | Análisis ESTÁTICO + EMULACIÓN de firmware IoT (FSTM 1-6): binwalk, filesystem, secretos/backdoors, y reparte la superficie a las verticales. |
-| **code-recon** | haiku-4-5 | Recon white-box de CÓDIGO (repos en `scope.source_repos[]`): stack, rutas/entrypoints, sinks y lógica de authz con `file:line`, secretos; siembra hipótesis que web/api-exploit confirman dinámicamente. |
+| **code-recon** | haiku-4-5 | Recon white-box de CÓDIGO (repos en `scope.source_repos[]`): stack, rutas/entrypoints, sinks y lógica de authz con `file:line`, secretos; siembra hipótesis que web/api-exploit confirman dinámicamente. Si el engagement revisa un PR/rama (`source_repos[].diff_base`), **prioriza por diff** (`tools/diff_scope.py`) los ficheros que el cambio realmente toca. |
 | **auth-recon** | haiku-4-5 | Adquisición de SESIÓN autenticada para las identidades de prueba: login web (Playwright) + TOTP/2FA → sesión en `loot/` (`secret_ref`/`validated`) para el testing de authz diferencial. |
 
 </details>
@@ -342,7 +342,7 @@ fijados; el orquestador decide a quién llamar en cada fase.
 
 | Agente | Modelo | Función |
 | :--- | :--- | :--- |
-| **vuln-triage** | sonnet-4-6 | Prioriza vulnerabilidades consultando el RAG (KEV/exploit/EPSS/CVSS). |
+| **vuln-triage** | sonnet-4-6 | Prioriza vulnerabilidades consultando el RAG (KEV/exploit/EPSS/CVSS); evalúa cada candidato no trivial con **≥2 personas** (atacante/escéptico) — el consenso prioriza lo que converge y frena lo disputado (falsos positivos/honeypots) antes de gastar esfuerzo en explotarlo. |
 | **nuclei** | haiku-4-5 | Escaneo de vulnerabilidades con plantillas de ProjectDiscovery. |
 | **web-exploit** | opus-4-8 | Explotación de aplicaciones web (capa 7 HTTP/S). |
 | **api-exploit** | opus-4-8 | Explotación de APIs REST/GraphQL (OWASP API Top 10 2023) con authz diferencial multi-identidad. |
@@ -511,7 +511,17 @@ especificar antes de ejecutar, y auditar la coherencia antes de reportar.
 - **Secretos fuera del repo:** token y user-id en `bot/.env` (ignorado por git).
 - **Regla de evidencia:** sin fuente, no se explota; sin evidencia, no es un hallazgo.
 - **Gobierno por [CONSTITUTION.md](CONSTITUTION.md)** y auditoría de coherencia previa al informe.
-- **Capa de guardarraíles deterministas** (gate de alcance, validación del blackboard, **aislamiento del sistema de archivos** —confina Read/Grep/Glob y rechaza symlinks/traversal—, anti-inyección en 27 agentes, detector de secretos, kill-switch de consumo, **validador del bus A2A** —emisor/destino conocidos + topología de pares + techo de hops—, **auditoría de subagentes**, **sanitización de la memoria de aprendizaje**, **anti-alboroto**, **anti-bucle** y **circuit-breaker por host** —corta el machaque de un target caído/baneado—) mapeada a OWASP LLM Top 10 — ver [GUARDRAILS.md](GUARDRAILS.md).
+- **Capa de guardarraíles deterministas** (gate de alcance, validación del blackboard, **anti-escritura
+  del blackboard por Bash** —fuerza que toda mutación pase por Write/Edit, gateadas por secretos/A2A/
+  esquema—, **integridad post-retorno del blackboard** —detecta si un subagente lo dejó dañado o
+  encogido, aunque la vía de escritura esquivara el guard anterior—, **aislamiento del sistema de
+  archivos** —confina Read/Grep/Glob y rechaza symlinks/traversal—, anti-inyección en 27 agentes,
+  detector de secretos, kill-switch de consumo, **validador del bus A2A** —emisor/destino conocidos +
+  topología de pares + techo de hops—, **auditoría de subagentes**, **sanitización de la memoria de
+  aprendizaje**, **anti-alboroto**, **anti-bucle**, **circuit-breaker por host** —corta el machaque de
+  un target caído/baneado— y **cabecera HTTP obligatoria del programa** —para programas de bug bounty
+  que exigen identificar el tráfico del investigador— mapeada a OWASP LLM Top 10 — ver
+  [GUARDRAILS.md](GUARDRAILS.md).
 - **El pilotaje del operador no relaja ninguna puerta:** las directivas de *steering* son intención del
   operador, no órdenes que salten las guardas — `steering.py` rechaza en origen cualquier tipo que ampliaría
   el scope, permitiría daño o **bajaría** la supervisión (`raise-approval` solo endurece), y los gates
@@ -576,6 +586,17 @@ Chuleta de todo lo ejecutable, por categoría. Salvo que se indique otra cosa, l
 | `python skilltrain/optimize.py --config skilltrain/config.json --dry-run` | Plan del optimizador de skills (SkillOpt, LAB-only, build-time). |
 | `python tools/tune_maxturns.py` | Recomienda `maxTurns` por agente según los turnos reales usados. |
 
+### 🕸️ Herramientas del engagement (el operador las usa durante una corrida)
+| Comando | Qué hace |
+| :--- | :--- |
+| `python tools/attack_path.py [--format graphml] [--out <ruta>]` | Exporta el grafo de la cadena multi-host (JSON/GraphML) desde el blackboard, solo-lectura. |
+| `python tools/steering.py list --pending` | Lista las directivas de pilotaje pendientes (foco/pausa/abortar-vector/pista/subir-aprobación). |
+| `python tools/steering.py add --type <tipo> [...]` · `ack --id <ID> --outcome ...` | Añade una directiva · la marca aplicada/rechazada/omitida. |
+| `python tools/http_proxy.py [--port <p>]` | Proxy de captura en el anillo efímero (transcript redactado + choke-point de scope). |
+| `python tools/diff_scope.py --repo <repo_id> [--out <ruta>]` | Ficheros cambiados de un PR/rama (`source_repos[].diff_base`) para priorizar `code-recon`. |
+| `python tools/screenshot.py --url <url> --engagement <id>` | Captura de evidencia (Playwright) que `web-exploit` lee con visión para confirmar/refutar. |
+| `python tools/acquire_session.py --identity <identity_id> [--engagement <id>]` | Login + TOTP (vía `auth-recon`) → sesión referenciada en `loot/`. |
+
 ### 🐳 Docker (alternativa al despliegue de host)
 | Comando | Qué hace |
 | :--- | :--- |
@@ -621,7 +642,9 @@ cyberseg-agents/
 ├── bot/            → bot de Telegram (Claude Agent SDK) + clasificador de riesgo
 ├── deploy/         → auto-deploy y verificación del toolchain en Kali (+ Docker: Dockerfile/compose)
 ├── dryrun/         → prueba end-to-end segura (sin atacar)
-├── .claude/        → settings, hooks (alcance, presupuesto, supervisión, blackboard, secretos, A2A, aislamiento FS, circuit-breaker, auditoría de subagentes) y los 29 subagentes
+├── .claude/        → settings, hooks (alcance, presupuesto, supervisión, blackboard + integridad,
+│                     secretos, A2A, aislamiento FS, anti-alboroto/anti-bucle, circuit-breaker, cabecera
+│                     obligatoria de programa, auditoría de subagentes) y los 29 subagentes
 └── .opencode/      → espejo de los agentes para opencode
 ```
 
