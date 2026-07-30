@@ -4,6 +4,17 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.6] - 2026-07-30
+### Added
+- **`tools/steering.py`: atribución opcional de operador** (`by=` en `enqueue()`, `by=`/`ack_by` en
+  `ack()` — y `--by` en la CLI `add`/`ack`). Origen: al conectar el dashboard privado al pilotaje
+  interactivo (v2.61), el council de esa integración señaló que una directiva sin identidad de quién
+  la dejó/confirmó es un punto ciego forense en un canal que puede pausar/abortar-vector/subir-
+  aprobación un engagement AUTÓNOMO en marcha, especialmente con más de un operador (CLI + dashboard +
+  bot) tocando el mismo `control/steering.json`. Retrocompatible: `by` es opcional, sin él el campo
+  simplemente no se añade (igual que `target`/`note`/`to`). Test nuevo en `tests/test_steering.py`
+  (guarda `by`, guarda `ack_by` sin pisar el `by` de `enqueue`, y sin `by=` no añade el campo).
+
 ## [2.68.5] - 2026-07-30
 ### Added
 - **AGENTS.md — punto (6) en "Disciplina anti-sesgos"**: deprioritizar un CVE por comparación de número

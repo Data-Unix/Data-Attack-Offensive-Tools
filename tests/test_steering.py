@@ -45,6 +45,15 @@ try:
           any(d["id"] == "S-001" and d["status"] == "applied" and d.get("applied_at")
               for d in st._load(EID)["directives"]))
 
+    # ── atribución de operador (v2.68.6, opcional -- el dashboard la fija desde la sesión) ────
+    d3 = st.enqueue(EID, "hint", note="atribuido", by="operador-dashboard")
+    check("enqueue con by= lo guarda", d3.get("by") == "operador-dashboard")
+    d3b = st.ack(EID, d3["id"], "applied", by="otro-operador")
+    check("ack con by= guarda ack_by (no pisa by= de enqueue)",
+          d3b.get("ack_by") == "otro-operador" and d3b.get("by") == "operador-dashboard")
+    d4 = st.enqueue(EID, "hint", note="sin atribuir")
+    check("enqueue sin by= no añade el campo", "by" not in d4)
+
     # ── REGLA DURA: una directiva no puede relajar una puerta ─────────────────────────
     def rejected(type_, **kw):
         try:

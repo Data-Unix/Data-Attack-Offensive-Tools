@@ -162,8 +162,12 @@ def validate(directive):
     return True, ""
 
 
-def enqueue(eid, type_, target=None, note=None, to=None):
-    """Añade una directiva 'pending' (tras validar que NO relaja ninguna puerta). Devuelve la directiva."""
+def enqueue(eid, type_, target=None, note=None, to=None, by=None):
+    """Añade una directiva 'pending' (tras validar que NO relaja ninguna puerta). Devuelve la directiva.
+    `by` (opcional): identidad del operador que la deja (p.ej. el usuario de sesión del dashboard) — para
+    la CLI interactiva no suele hacer falta (el propio operador ya está delante), pero un canal con
+    varios operadores/procesos (dashboard, bot, CLI) sin atribución es un punto ciego forense en un canal
+    que puede pausar/abortar-vector/subir-aprobación un engagement AUTÓNOMO en marcha."""
     d = {"type": type_, "status": "pending",
          "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     if target:
@@ -172,6 +176,8 @@ def enqueue(eid, type_, target=None, note=None, to=None):
         d["note"] = note
     if to:
         d["to"] = to
+    if by:
+        d["by"] = str(by)
     ok, why = validate(d)
     if not ok:
         raise ValueError(why)
@@ -193,8 +199,9 @@ def pending(eid):
             if d.get("status") == "pending" and d.get("type") in ALLOWED_TYPES]
 
 
-def ack(eid, directive_id, outcome="applied", note=None):
-    """Marca una directiva como applied/rejected/skipped. Devuelve la directiva o lanza KeyError."""
+def ack(eid, directive_id, outcome="applied", note=None, by=None):
+    """Marca una directiva como applied/rejected/skipped. Devuelve la directiva o lanza KeyError.
+    `by` (opcional): identidad de quién confirma (ver `enqueue`)."""
     if outcome not in OUTCOMES:
         raise ValueError(f"outcome debe ser uno de {sorted(OUTCOMES)}")
     with _locked(eid):
@@ -205,6 +212,8 @@ def ack(eid, directive_id, outcome="applied", note=None):
                 d["applied_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                 if note:
                     d["ack_note"] = note
+                if by:
+                    d["ack_by"] = str(by)
                 atomic_write_json(_control_path(eid), state)
                 return d
     raise KeyError(f"no existe la directiva '{directive_id}'")
@@ -220,24 +229,26 @@ def main(argv=None):
     a.add_argument("--target", default=None, help="target_id / vector al que aplica (si procede).")
     a.add_argument("--note", default=None, help="texto/pista para el Orquestador.")
     a.add_argument("--to", default=None, help="para raise-approval: nivel más estricto (critical/full).")
+    a.add_argument("--by", default=None, help="identidad de quién la deja (opcional; p.ej. el dashboard).")
     lst = sub.add_parser("list", help="lista las directivas.")
     lst.add_argument("--pending", action="store_true", help="solo las pendientes.")
     ackp = sub.add_parser("ack", help="marca una directiva como aplicada/rechazada/omitida.")
     ackp.add_argument("--id", required=True)
     ackp.add_argument("--outcome", default="applied", choices=sorted(OUTCOMES))
     ackp.add_argument("--note", default=None)
+    ackp.add_argument("--by", default=None, help="identidad de quién confirma (opcional).")
     args = ap.parse_args(argv)
 
     eid = args.engagement or current_engagement_id()
     try:
         if args.cmd == "add":
-            d = enqueue(eid, args.type, args.target, args.note, args.to)
+            d = enqueue(eid, args.type, args.target, args.note, args.to, args.by)
             print(json.dumps(d, ensure_ascii=False))
         elif args.cmd == "list":
             items = pending(eid) if args.pending else _load(eid).get("directives", [])
             print(json.dumps(items, ensure_ascii=False, indent=2))
         elif args.cmd == "ack":
-            print(json.dumps(ack(eid, args.id, args.outcome, args.note), ensure_ascii=False))
+            print(json.dumps(ack(eid, args.id, args.outcome, args.note, args.by), ensure_ascii=False))
     except ValueError as e:
         print(f"steering: {e}", file=sys.stderr)
         return 3
