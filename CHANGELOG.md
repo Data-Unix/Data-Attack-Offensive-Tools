@@ -4,6 +4,23 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.5] - 2026-07-30
+### Added
+- **AGENTS.md — punto (6) en "Disciplina anti-sesgos"**: deprioritizar un CVE por comparación de número
+  de versión ("mi paquete es posterior al que creo que es el fix") sin confirmar el umbral REAL contra
+  la fuente del vendor (`ubuntu.com/security/CVE-…`, security-tracker de Debian/RHEL) es un guess, no
+  una verificación, aunque acierte. Origen: diagnóstico del estancamiento en fase `exploitation` de
+  `GATE-dockerlabs-injection` (29-jul) — el motor descartó CVE-2024-6387 (regreSSHion) por inferencia de
+  versión (`3ubuntu13.14` posterior a `3ubuntu13.5`, su propio umbral de referencia); se verificó
+  independientemente contra `ubuntu.com/security/cve-2024-6387` (fix real en Ubuntu 24.04:
+  `3ubuntu13.3`) — la conclusión del motor era correcta, pero por inferencia, no por consulta a la
+  fuente. Se codifica la disciplina para que la próxima vez no dependa de acertar por casualidad.
+- **Dos directivas de pilotaje** (`tools/steering.py`) dejadas en el engagement real
+  `GATE-dockerlabs-injection` para la próxima reanudación: `abort-vector` sobre F-007 (regreSSHion,
+  cerrado con la fuente verificada arriba) y `hint` (antes de más cracking offline de bcrypt —caro y de
+  baja probabilidad sin GPU—, probar un pequeño set adicional de usuarios de sistema temáticos cruzados
+  con las 3 contraseñas ya conocidas del engagement).
+
 ## [2.68.4] - 2026-07-29
 ### Added
 - **`tools/reconcile_subagents.py`**: backfill determinista de `evidence/subagents.jsonl` desde los

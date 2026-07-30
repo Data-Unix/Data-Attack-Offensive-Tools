@@ -310,8 +310,12 @@ primera/obvia (visión de túnel); (2) **busca evidencia que las REFUTE**, no so
 confirmación); (3) **no te fíes a ciegas** de la salida de una tool ni de un hit del RAG — verifícalo contra
 el comportamiento real (sesgo de automatización; §3 "sin fuente no se explota"); (4) lo **"demasiado fácil"
 es sospechoso** (posible honeypot/cebo, no una victoria); (5) si un vector falla, **cambia de hipótesis** en
-vez de repetir (coste hundido). Inyecta este encuadre al delegar en triage/explotación. `knowledge-postmortem`
-consolida la lección al cierre (solo si `times_observed ≥ 3`, anti-sobreajuste).
+vez de repetir (coste hundido); (6) **deprioridad un CVE por versión solo con la fuente del vendor a la
+vista** (`ubuntu.com/security/CVE-…`, security-tracker de Debian/RHEL, advisory oficial) — comparar números
+de parche (`3ubuntu13.14` vs `3ubuntu13.5`) sin confirmar el umbral REAL de la fuente es un guess, no una
+verificación, aunque acierte; el coste de mirar el advisory es bajo (minutos, sin tocar el target) frente al
+de descartar mal un vector de alto impacto. Inyecta este encuadre al delegar en triage/explotación.
+`knowledge-postmortem` consolida la lección al cierre (solo si `times_observed ≥ 3`, anti-sobreajuste).
 
 ## Pilotaje interactivo (steering — mejora v2.61)
 El operador puede **pilotar el engagement en marcha** sin reiniciarlo: deja DIRECTIVAS en
