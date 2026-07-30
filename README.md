@@ -585,6 +585,7 @@ Chuleta de todo lo ejecutable, por categoría. Salvo que se indique otra cosa, l
 | `python benchmark/run_gate.py --eval <id> --canary --record` | + canario por-corrida: la prueba es un token inforjable plantado en el target (anti-reward-hack). |
 | `python skilltrain/optimize.py --config skilltrain/config.json --dry-run` | Plan del optimizador de skills (SkillOpt, LAB-only, build-time). |
 | `python tools/tune_maxturns.py` | Recomienda `maxTurns` por agente según los turnos reales usados. |
+| `python tools/reconcile_subagents.py --engagement-id <id> [--dry-run]` | Backfill determinista de `evidence/subagents.jsonl` desde los transcripts (el hook `SubagentStop` dispara de forma no determinista en headless); `run_gate.py` ya lo invoca solo tras cada corrida. |
 
 ### 🕸️ Herramientas del engagement (el operador las usa durante una corrida)
 | Comando | Qué hace |

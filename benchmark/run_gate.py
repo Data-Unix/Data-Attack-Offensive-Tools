@@ -690,6 +690,24 @@ def main():
                                           iter_timeout=args.iter_timeout)
         verdict = "PASS" if passed else "FAIL"
         print(f"\n[{verdict}] {ev['id']}  detalle={json.dumps(detail)}")
+        # Reconciliación best-effort de subagents.jsonl (SubagentStop dispara de forma NO determinista en
+        # headless — ver ROADMAP-subagents-audit-gap.md): backfillea desde los transcripts lo que el hook
+        # no llegó a auditar en vivo. Nunca afecta al veredicto (ya decidido arriba) ni lo relanza.
+        try:
+            sys.path.insert(0, os.path.join(ROOT, "tools"))
+            from reconcile_subagents import reconcile as _reconcile, write_lines as _write_reconciled
+            _new, _rstats = _reconcile(ROOT, f"GATE-{ev['id']}")
+            _write_reconciled(_rstats["audit_file"], _new)
+            # Siempre visible (no solo si hay backfill): transcripts_scanned=0 (p.ej. el slug del
+            # proyecto cambió de algoritmo en una versión futura de Claude Code) debe distinguirse de
+            # "no había nada que reconciliar" — si no, el propio mecanismo de compensación podría
+            # dejar de funcionar en silencio sin que nadie lo note.
+            print(f"[gate] reconcile subagents.jsonl: transcripts={_rstats['transcripts_scanned']}"
+                  f" (irrelevantes={_rstats['transcripts_skipped_irrelevant']})"
+                  f"  +{len(_new)} línea(s) nueva(s)")
+        except Exception as _exc:  # noqa: BLE001 — fail-safe: la reconciliación jamás rompe el gate
+            print(f"[gate] aviso: reconciliación de subagents.jsonl falló ({_exc}); no afecta al veredicto",
+                  file=sys.stderr)
         _snapshot_blackboard(eng)  # deja el blackboard final junto a los artefactos del lab
         if args.record:
             res = os.path.join(HERE, "results.jsonl")

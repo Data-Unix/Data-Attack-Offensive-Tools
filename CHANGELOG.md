@@ -4,6 +4,48 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.4] - 2026-07-29
+### Added
+- **`tools/reconcile_subagents.py`**: backfill determinista de `evidence/subagents.jsonl` desde los
+  transcripts de Claude Code. El hook `SubagentStop` SÍ dispara en headless (`claude -p`) pero de
+  forma NO DETERMINISTA a nivel de SESIÓN (limitación upstream: anthropics/claude-code#33049,
+  #20063) — sesiones con subagentes que completaron de verdad (tienen `tool_result` en su
+  transcript) a veces no dejan NINGUNA línea de auditoría. El reconciliador cruza cada spawn del
+  Agent/Task tool (`tool_use` con `subagent_type`) con su compleción (`tool_result`) en el transcript
+  de la sesión del Orquestador, y ANEXA (append-only, nunca reescribe) las líneas que falten,
+  marcadas `"source":"transcript-reconcile"` + `tool_use_id` para dedupe exacto e idempotencia
+  (correr dos veces no duplica). Los huérfanos (spawn sin `tool_result`) NO se backfillean. Aislado
+  por `engagement_id` a nivel de REGISTRO, no de fichero completo (council: Devil's Advocate +
+  Security Auditor señalaron que un aislamiento a nivel de fichero dejaría contaminar la evidencia si
+  una sesión larga llegara a tocar más de un engagement — el turno `assistant` que delega debe
+  mencionar `engagement_id` él mismo, no basta con que aparezca en cualquier otro punto del
+  transcript) y fail-safe (un error aquí nunca rompe el flujo que lo invoque). `--engagement-id`
+  valida el charset (anti path-traversal en la ruta de escritura).
+  Verificado contra datos reales en Kali (`GATE-dockerlabs-injection`): encontró exactamente los
+  huecos que la investigación manual del ROADMAP había identificado sesión por sesión (p.ej. la
+  sesión `84bf5d5c` con `web-exploit` completado + `network-exploit` huérfano → backfillea solo el
+  primero), pasó `subagents.jsonl` de 14 a 28 líneas reales, y una segunda pasada inmediata confirma
+  `backfill=0` (idempotencia; reverificado tras el endurecimiento por-registro). Test nuevo
+  `tests/test_reconcile_subagents.py` (15 casos: backfill exacto, idempotencia, huérfanos excluidos,
+  respeta líneas de hook ya presentes, aislamiento entre engagements a nivel de fichero Y de registro
+  dentro del mismo fichero).
+- **`benchmark/run_gate.py`** invoca el reconciliador como paso post-grade (best-effort, tras decidir
+  el veredicto y antes de `_snapshot_blackboard`): cada corrida del gate deja `subagents.jsonl`
+  completo aunque el hook no disparara en alguna iteración. Nunca afecta al veredicto (ya decidido) ni
+  lo relanza; un fallo del reconciliador solo imprime un aviso. Imprime SIEMPRE `transcripts_scanned`
+  (no solo cuando hay backfill): un fallo de detección de transcripts (p.ej. si el algoritmo de slug
+  de proyecto de Claude Code cambiara en una versión futura) debe distinguirse de "no había nada que
+  reconciliar" — si no, el propio mecanismo de compensación podría dejar de funcionar en silencio.
+
+**Council local (4 lentes) sobre este cambio — diferido, no bloqueante:** el conteo por-clave
+`(session_id, subagent_type)` no verifica correspondencia 1:1 exacta entre líneas del hook y spawns
+del transcript (documentado como limitación aceptada, no bug); la Scalability Architect señaló que el
+reconciliador re-escanea todo el histórico de transcripts en cada corrida (sin cursor incremental) —
+aceptable al volumen actual de un solo operador, candidato a paginar si esto pasa a correrse a mayor
+frecuencia/escala. El Devil's Advocate propuso una alternativa arquitectónica más profunda (mover la
+propia escritura de auditoría a un hook `PostToolUse:Task` en vez de depender de `SubagentStop` +
+reconciliación posterior) — válida pero fuera de alcance de esta versión.
+
 ## [2.68.3] - 2026-07-29
 ### Fixed
 - **El Orquestador headless (`run_gate.py`) no delegaba vía `Task`, dejando el blackboard vacío.**
