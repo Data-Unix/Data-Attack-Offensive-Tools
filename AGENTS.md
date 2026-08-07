@@ -26,6 +26,14 @@ ejecutas tooling ofensivo tú mismo: planificas, delegas, validas, **enrutas** y
 ## Flujo de un engagement
 1. **Init.** Lee `scope.json`. Crea/actualiza `contracts/engagement.json` con el esquema
    de `engagement.schema.json` (engagement_id, scope_ref, fase=`recon`).
+   > **Archivar al CONMUTAR (no pierdas el engagement anterior).** Si vas a crear un engagement
+   > NUEVO que reemplaza a un activo distinto, archiva ANTES el saliente:
+   > `python tools/archive_engagement.py --on-switch <nuevo_engagement_id>`. Deja el blackboard del
+   > saliente en `engagements/<id_saliente>/engagement.json` (consultable como histórico, p.ej. por el
+   > dashboard). Es no-op si el activo ya es `<nuevo_engagement_id>` (RESUMIR, no conmutar) y no muta
+   > nada del activo. Si es el PRIMER engagement (no hay activo previo), no hace falta. **Si el tool
+   > imprime un `AVISO` de que NO pudo archivar (sale con código 2), NO sobrescribas el activo todavía:
+   > resuelve el problema primero (p.ej. blackboard a medio escribir), o perderías el saliente.**
 2. **Recon.** Delega en `osint-recon` (pasivo) y luego `active-recon`. Cada uno escribe
    `targets[]` en el blackboard. Si un activo expone una **API** (rutas `/api`, `swagger`/`openapi.json`,
    GraphQL, backend de app móvil), delega además en **`api-recon`** para inventariar la superficie
@@ -120,7 +128,12 @@ ejecutas tooling ofensivo tú mismo: planificas, delegas, validas, **enrutas** y
    Si `lateral-discovery` descubre hosts internos en scope, **no cierres**: trátalos como nueva
    frontera y repite el ciclo a través del pivot (ver "Orquestación multi-host").
 6. **Cierre.** Delega en `reporting` (genera informe desde `findings[]`) y en
-   `knowledge-postmortem` (extrae lecciones a memoria).
+   `knowledge-postmortem` (extrae lecciones a memoria). Tras la auditoría de coherencia
+   (`tools/analyze_engagement.py`, Regla 0), **archiva el blackboard final**:
+   `python tools/archive_engagement.py`. Copia `contracts/engagement.json` a
+   `engagements/<id>/engagement.json`, dejando el engagement AUTOCONTENIDO y consultable como histórico
+   (p.ej. por el registro multi-engagement del dashboard) una vez deje de ser el activo. No muta el
+   blackboard ni el puntero de 'activo' (solo copia); es idempotente y E3-safe.
    > **Grado de prueba reconciliado con la ROE (`proof_state` — mejora Shannon "F").** El informe se
    > filtra por el **grado de prueba** de cada finding, un eje ORTOGONAL a `status`: `proven-by-exploit`
    > (PoC reproducible), `evidenced` (corroborado por comportamiento observado), `roe-capped` (REAL y

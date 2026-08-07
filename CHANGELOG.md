@@ -4,6 +4,36 @@ Todas las novedades reseñables de **Data Attack — Offensive Tools** se docume
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto
 se versiona con [SemVer](https://semver.org/lang/es/).
 
+## [2.68.7] - 2026-08-07
+### Added
+- **`tools/archive_engagement.py`: archivado del blackboard activo en producción (Fase 5b
+  multi-engagement).** Copia `contracts/engagement.json` (blackboard del engagement ACTIVO) a
+  `engagements/<id>/engagement.json`, dejando el engagement AUTOCONTENIDO y **consultable como
+  histórico** una vez deje de ser el activo. Origen: el registro multi-engagement del dashboard privado
+  (v0.57.0) lee el blackboard archivado de los históricos, pero hasta ahora **solo `benchmark/run_gate.py`
+  archivaba** (con `_snapshot_blackboard`) — en producción, al conmutar de engagement, el blackboard del
+  anterior se perdía y el dashboard solo veía sus artefactos. Este tool es el equivalente de producción
+  de ese snapshot, cableado en **AGENTS.md** en los dos seams del flujo del Orquestador: al **Cierre**
+  (paso 6, `python tools/archive_engagement.py`) y al **Conmutar** (paso 1,
+  `--on-switch <nuevo_id>`, que archiva el saliente solo si su id != nuevo_id — no-op al RESUMIR).
+  Garantías: NO muta el blackboard activo ni el puntero de 'activo' (solo copia de lectura);
+  idempotente; escritura ATÓMICA (tmp + `os.replace`, un lector concurrente nunca ve un fichero a
+  medias); E3-safe (destino SIEMPRE bajo `engagements/<id>/`, id validado anti-traversal `.`/`..`/
+  dot-leading + cinturón por realpath); best-effort (sin blackboard/JSON corrupto/id inválido → no
+  archiva y no revienta el flujo). Test `tests/test_archive_engagement.py` (byte-identidad, no-mutación,
+  idempotencia, `--on-switch` no-op vs distinto, fail-safe, confinamiento de traversal, wiring en
+  AGENTS.md). **NOTA:** completa la *Fase 5a* (solo-lectura) del dashboard; con producción archivando,
+  todos los históricos pasan a tener blackboard consultable, no solo artefactos.
+  - **Council v2.68.7 (GO, sin must-fix) — endurecimiento aplicado:** `archive_active` devuelve ahora
+    un `outcome` de tres estados (`archived`/`noop`/`error`) en vez de un booleano, y la CLI sale con
+    **código 2 solo ante fallo genuino** (había un blackboard pero no se pudo archivar) — distinguible
+    del no-op (código 0). Cierra la ventana de pérdida de datos en la CONMUTACIÓN: si `--on-switch`
+    falla, imprime un `AVISO` a stderr y AGENTS.md instruye al Orquestador a NO sobrescribir el activo
+    hasta resolverlo. Además, **verificación post-escritura** (re-lee el destino y confirma
+    byte-identidad tras `os.replace`) → el éxito es una señal fiable de "seguro sobrescribir". Tests
+    ampliados: cinturón realpath (rechazo de symlink que escapa de la zona E3), rama OSError
+    (`engagements/` como fichero), no-mutación del activo en `--on-switch`, y códigos de salida de la CLI.
+
 ## [2.68.6] - 2026-07-30
 ### Added
 - **`tools/steering.py`: atribución opcional de operador** (`by=` en `enqueue()`, `by=`/`ack_by` en
